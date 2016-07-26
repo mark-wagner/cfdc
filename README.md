@@ -6,6 +6,8 @@ CloudFlare Dynamic DNS client
 
 All the other CloudFlare DDNS clients I examined use the deprecated API v1. This script uses API v4.
 
+Rather than using DNS to resolve the host, the CloudFlare API is queried for the IP. This allows the script to function with split-horizon DNS where the host resolves to an internal IP.
+
 ## Installation
 
 https://github.com/mark-wagner/portage/tree/master/net-dns/cfdc/cfdc-9999.ebuild
