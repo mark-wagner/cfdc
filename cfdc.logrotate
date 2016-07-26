@@ -1,0 +1,7 @@
+/var/log/cfdc/cfdc.log {
+  missingok
+  notifempty
+  postrotate
+  /etc/init.d/cfdc restart > /dev/null 2>&1 || true
+  endscript
+}
