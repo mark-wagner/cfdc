@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+#
+# Copyright 1999-2016 Mark Wagner
+# Distributed under the terms of the GNU General Public License v2
+
+PROG=/usr/bin/cfdc
+
+depend() {
+	use net
+}
+
+start() {
+	ebegin "Starting cloudflare ddns client"
+	start-stop-daemon --start --pidfile "$PID_FILE" --user "$USER:$GROUP" \
+        --background --interpreted --make-pidfile --stdout "$LOG_FILE" \
+        --stderr "$LOG_FILE" "$PROG" -- --config "$CONFIG_FILE" $OPTS
+	eend $?
+}
+
+stop() {
+	ebegin "Stopping cloudflare ddns client"
+	start-stop-daemon --stop --pidfile "$PID_FILE" "$PROG"
+	eend $?
+}

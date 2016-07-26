@@ -1,0 +1,214 @@
+#!/usr/bin/python
+
+# Copyright 1999-2016 Mark Wagner
+# Distributed under the terms of the GNU General Public License v2
+
+# CloudFlare Dynamic DNS Client
+
+import time
+import argparse
+import urllib2
+import logging
+import time
+import json
+import requests
+
+def get_external_ip():
+    logging.debug("attempting to determine external IP")
+    for url in config["ip_urls"]:
+        try:
+            logging.debug("fetching {}".format(url))
+            r = requests.get(url)
+            r.raise_for_status()
+            ip = r.text.rstrip()
+            octets = ip.split(".")
+            if len(octets) != 4 or any(int(o) < 0 or int(o) > 255 for o in octets):
+                raise TypeError("{} is not an IP address in dotted quad form".format(ip))
+            logging.info("external ip is {}".format(ip))
+            return ip
+        except Exception as e:
+            logging.warning("exception: {} {} {}".format(type(e), e.args, e))
+
+    logging.warning("could not determine external ip address")
+    return None
+
+def get_zone_id():
+    logging.debug("attempting to determine zone id")
+    headers = {
+        "X-AUTH-KEY": config["api_key"],
+        "X-AUTH-EMAIL": config["email"]
+    }
+    try:
+        r = requests.get("{}/zones".format(config["endpoint"]), headers = headers,
+            params = { "name": config["zone"]})
+        r.raise_for_status()
+        zone = r.json()
+    except Exception as e:
+        logging.warning("exception: {} {} {}".format(type(e), e.args, e))
+        return None
+
+    logging.debug("response: {}".format(zone))
+
+    if not zone["success"]:
+        logging.warning("errors {}, messages {}".format(zone["errors"], zone["messages"]))
+        return None
+
+    if zone["result_info"]["total_count"] != 1:
+        logging.warning("{} zones returned, expected 1".format(zone["result_info"]["total_count"]))
+        return None
+
+    zone_id = zone["result"][0]["id"]
+    logging.debug("zone {} id {}".format(config["zone"], zone_id))
+    return zone_id
+
+def get_cloudflare_ip_info():
+    logging.debug("attempting to determine cloudflare IP")
+
+    zone_id = get_zone_id()
+    if not zone_id:
+        return None
+
+    headers = {
+        "X-AUTH-KEY": config["api_key"],
+        "X-AUTH-EMAIL": config["email"]
+    }
+    try:
+        r = requests.get("{}/zones/{}/dns_records".format(config["endpoint"], zone_id),
+            headers = headers, params = { "name": "{}.{}".format(config["name"], config["zone"])})
+        r.raise_for_status()
+        rrs = r.json()
+    except Exception as e:
+        logging.warning("exception: {} {} {}".format(type(e), e.args, e))
+        return None
+
+    logging.debug("response: {}".format(rrs))
+
+    if not rrs["success"]:
+        logging.warning("errors {}, messages {}".format(rrs["errors"], rrs["messages"]))
+        return None
+
+    if rrs["result_info"]["total_count"] == 0:
+        logging.info("no ip for name {}".format(config["name"]))
+        return { "zone_id": zone_id, "ip": None, "ip_id": None }
+
+    if rrs["result_info"]["total_count"] > 1:
+        logging.warning("{} rrs returned, expected 1".format(rrs["result_info"]["total_count"]))
+        return None
+
+    ip = rrs["result"][0]["content"]
+    ip_id = rrs["result"][0]["id"]
+    logging.info("name {} ip {} ip_id {}".format(config["name"], ip, ip_id))
+    return { "zone_id": zone_id, "ip": ip, "ip_id": ip_id }
+
+def add_cloudfare_ip(zone_id, ip):
+    logging.debug("attempting to add {} to {}".format(ip, config["name"]))
+    headers = {
+        "X-AUTH-KEY": config["api_key"],
+        "X-AUTH-EMAIL": config["email"]
+    }
+    payload = {
+        "type": "A",
+        "name": "{}.{}".format(config["name"], config["zone"]),
+        "content": ip,
+        "ttl": config["ttl"]
+    }
+    try:
+        r = requests.post("{}/zones/{}/dns_records".format(config["endpoint"], zone_id),
+            headers = headers, data = json.dumps(payload))
+        r.raise_for_status()
+        response = r.json()
+    except Exception as e:
+        logging.warning("exception: {} {} {}".format(type(e), e.args, e))
+        return None
+
+    logging.debug("response: {}".format(response))
+
+    if not response["success"]:
+        logging.warning("errors {}, messages {}".format(response["errors"], response["messages"]))
+        return None
+
+    logging.info("added {} = {}".format(config["name"], ip))
+    return True
+
+def update_cloudflare_ip(zone_id, ip_id, ip):
+    logging.debug("attempting to update {} to {}".format(config["name"], ip))
+    headers = {
+        "X-AUTH-KEY": config["api_key"],
+        "X-AUTH-EMAIL": config["email"]
+    }
+    payload = {
+        "type": "A",
+        "name": config["name"],
+        "content": ip
+    }
+    try:
+        r = requests.put("{}/zones/{}/dns_records/{}".format(config["endpoint"], zone_id, ip_id),
+            headers = headers, data = json.dumps(payload))
+        r.raise_for_status()
+        response = r.json()
+    except Exception as e:
+        logging.warning("exception: {} {} {}".format(type(e), e.args, e))
+        return None
+
+    logging.debug("response: {}".format(response))
+
+    if not response["success"]:
+        logging.warning("errors {}, messages {}".format(response["errors"], response["messages"]))
+        return None
+    logging.info("updated {} = {}".format(config["name"], ip))
+    return True
+
+def cfdc(args):
+
+    global config
+    config = {
+        "sleep": 300,
+        "ip_urls": [
+            "http://ipecho.net/plain",
+            "http://icanhazip.com/",
+        ],
+        "endpoint": "https://api.cloudflare.com/client/v4",
+        "ttl": 120
+    }
+
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s",
+        level=getattr(logging, args.loglevel, None))
+
+    logging.info("loading config file {}".format(args.config))
+    with open(args.config, "r") as config_fh:
+        config.update(json.load(config_fh))
+    logging.debug("config: {}".format(config))
+
+    first_loop = True
+
+    while (True):
+
+        if not first_loop:
+            logging.info("sleeping for {} seconds".format(config["sleep"]))
+            time.sleep(float(config["sleep"]))
+        first_loop = False
+            
+        ext_ip = get_external_ip()
+        if ext_ip is None:
+            continue
+
+        cf_ip_info = get_cloudflare_ip_info()
+        if cf_ip_info is None:
+            continue
+
+        if cf_ip_info["ip"] is None:
+            add_cloudfare_ip(zone_id = cf_ip_info["zone_id"], ip = ext_ip)
+        elif ext_ip == cf_ip_info["ip"]:
+            logging.info("ips match")
+        else:
+            update_cloudflare_ip(zone_id = cf_ip_info["zone_id"], ip = ext_ip,
+                ip_id = cf_ip_info["ip_id"])
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", help="config file", default="/etc/cfdc.conf")
+    parser.add_argument("--loglevel", help="set log level", default="INFO",
+    choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    args = parser.parse_args()
+    cfdc(args) 
+   # unreaachable

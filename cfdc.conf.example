@@ -1,0 +1,6 @@
+{
+    "api_key": "1234"
+    "email": "test@example.com",
+    "name": "foo",
+    "zone": "example.net"
+}
