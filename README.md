@@ -10,13 +10,14 @@ Rather than using DNS to resolve the host, the CloudFlare API is queried for the
 
 ## Installation
 
+### Gentoo
+
 https://github.com/mark-wagner/portage/tree/master/net-dns/cfdc/cfdc-9999.ebuild
 
 Add =net-dns/cfdc-9999 \*\* to /etc/portage/package.keywords.
 
 Create a configuration file (default is /etc/cfdc.conf). The format is JSON and these are the required keys:
-* api\_key - CloudFlare API Key https://www.cloudflare.com/a/account/my-account -> Global API Key
-* email - Email address associated with the zone
+* api\_token - cloudflare api token with Zone.Zone, Zone.DNS permissions
 * name - host name you want to update
 * zone - zone (domain) you want to update
 
@@ -31,6 +32,45 @@ Update /etc/conf.d/cfdc as needed.
 To have the script start at boot run `rc-update add cfdc default`. The provided init script is for OpenRC. Adapt for your favorite init system. :)
 
 If you changed the location of the log file update /etc/logrotate.d/cfdc.
+
+### Kubernetes
+
+Create a json file cfdc.conf with keys desribed as above.
+
+```
+kubectl create secret generic cfdc --from-file cfdc.conf
+```
+
+Sample manifest:
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cfdc
+  labels:
+    app: cfdc
+spec:
+  selector:
+    matchLabels:
+      app: cfdc
+  template:
+    metadata:
+      labels:
+        app: cfdc
+    spec:
+      containers:
+      - name: cfdc
+        image: marklanfearnet/cfdc:latest
+        volumeMounts:
+        - name: cfdc
+          mountPath: /etc/cfdc
+          readOnly: true
+      volumes:
+      - name: cfdc
+        secret:
+          secretName: cfdc
+```
 
 ## License
 
