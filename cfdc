@@ -33,8 +33,8 @@ def get_external_ip():
 def get_zone_id():
     logging.debug("attempting to determine zone id")
     headers = {
-        "X-AUTH-KEY": config["api_key"],
-        "X-AUTH-EMAIL": config["email"]
+        "Authorization": "Bearer {}".format(config["api_token"]),
+        "Content-Type": "application/json"
     }
     try:
         r = requests.get("{}/zones".format(config["endpoint"]), headers = headers,
@@ -67,8 +67,8 @@ def get_cloudflare_ip_info():
         return None
 
     headers = {
-        "X-AUTH-KEY": config["api_key"],
-        "X-AUTH-EMAIL": config["email"]
+        "Authorization": "Bearer {}".format(config["api_token"]),
+        "Content-Type": "application/json"
     }
     try:
         r = requests.get("{}/zones/{}/dns_records".format(config["endpoint"], zone_id),
@@ -101,8 +101,8 @@ def get_cloudflare_ip_info():
 def add_cloudfare_ip(zone_id, ip):
     logging.debug("attempting to add {} to {}".format(ip, config["name"]))
     headers = {
-        "X-AUTH-KEY": config["api_key"],
-        "X-AUTH-EMAIL": config["email"]
+        "Authorization": "Bearer {}".format(config["api_token"]),
+        "Content-Type": "application/json"
     }
     payload = {
         "type": "A",
@@ -131,8 +131,8 @@ def add_cloudfare_ip(zone_id, ip):
 def update_cloudflare_ip(zone_id, ip_id, ip):
     logging.debug("attempting to update {} to {}".format(config["name"], ip))
     headers = {
-        "X-AUTH-KEY": config["api_key"],
-        "X-AUTH-EMAIL": config["email"]
+        "Authorization": "Bearer {}".format(config["api_token"]),
+        "Content-Type": "application/json"
     }
     payload = {
         "type": "A",
@@ -204,7 +204,7 @@ def cfdc(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="config file", default="/etc/cfdc.conf")
+    parser.add_argument("--config", help="config file", default="/etc/cfdc/cfdc.conf")
     parser.add_argument("--loglevel", help="set log level", default="INFO",
     choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
     args = parser.parse_args()
