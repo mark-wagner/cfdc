@@ -10,12 +10,14 @@ Rather than using DNS to resolve the host, the CloudFlare API is queried for the
 
 ## Installation
 
-https://github.com/mark-wagner/portage/tree/master/net-dns/cfdc/cfdc-9999.ebuild
+**I use (rootless) podman now so only the format of /etc/cfdc/cfdc.conf is documented here.**
 
-Add =net-dns/cfdc-9999 \*\* to /etc/portage/package.keywords.
+However, I use `podman build --tag quay.io/mark/cfdc .` which is probably simple-minded and wrong.
 
-Create a configuration file (default is /etc/cfdc.conf). The format is JSON and these are the required keys:
-* api\_key - CloudFlare API Key https://www.cloudflare.com/a/account/my-account -> Global API Key
+`cfdc.container` goes in `~/.config/containers/systemd/cfdc.container`. Then run `systemctl --user daemon-reload`.
+
+Create a configuration file (default is /etc/cfdc/cfdc.conf). The format is JSON and these are the required keys:
+* api\_token - CloudFlare API Key https://www.cloudflare.com/a/account/my-account -> Global API Key
 * email - Email address associated with the zone
 * name - host name you want to update
 * zone - zone (domain) you want to update
@@ -26,11 +28,7 @@ Optional keys:
 * endpoint - CloudFlare API endpoint
 * ttl - time to live of entry
 
-Update /etc/conf.d/cfdc as needed.
-
-To have the script start at boot run `rc-update add cfdc default`. The provided init script is for OpenRC. Adapt for your favorite init system. :)
-
-If you changed the location of the log file update /etc/logrotate.d/cfdc.
+I push images to https://quay.io/repository/markw/cfdc
 
 ## License
 

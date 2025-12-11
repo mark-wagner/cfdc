@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-# Copyright 1999-2016 Mark Wagner
+# Copyright 1999-2025 Mark Wagner
 # Distributed under the terms of the GNU General Public License v2
 
 # CloudFlare Dynamic DNS Client

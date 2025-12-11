@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Dynamic DNS Client
+After=local-fs.target
+
+[Container]
+ContainerName=cfdc
+Image=quay.io/markw/cfdc
+Volume=%h/container_volumes/cfdc_conf:/etc/cfdc
+AutoUpdate=local
+
+[Service]
+Restart=no
+
+[Install]
+WantedBy=default.target
